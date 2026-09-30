@@ -1,4 +1,4 @@
-﻿// PanelKey.cpp
+// PanelKey.cpp
 
 #include "StdAfx.h"
 
@@ -42,7 +42,6 @@ bool CPanel::OnKeyDown(LPNMLVKEYDOWN keyDownInfo, LRESULT &result)
   }
   bool alt = IsKeyDown(VK_MENU);
   bool ctrl = IsKeyDown(VK_CONTROL);
-  // bool leftCtrl = IsKeyDown(VK_LCONTROL);
   bool rightCtrl = IsKeyDown(VK_RCONTROL);
   bool shift = IsKeyDown(VK_SHIFT);
   result = 0;
@@ -80,6 +79,12 @@ bool CPanel::OnKeyDown(LPNMLVKEYDOWN keyDownInfo, LRESULT &result)
     int index = FindVKeyPropIDPair(keyDownInfo->wVKey);
     if (index >= 0)
       SortItemsWithPropID(g_VKeyPropIDPairs[index].PropID);
+  }
+
+  if (ctrl && !alt && !shift && (keyDownInfo->wVKey == 'F' || keyDownInfo->wVKey == 'f'))
+  {
+    g_App.FindFiles();
+    return true;
   }
 
   switch (keyDownInfo->wVKey)
@@ -144,9 +149,6 @@ bool CPanel::OnKeyDown(LPNMLVKEYDOWN keyDownInfo, LRESULT &result)
     {
       if (!alt && !ctrl && !shift)
       {
-        /* we can process F7 via menu ACCELERATOR.
-          But menu loading can be slow in case of UNC paths and system menu.
-          So we use don't use ACCELERATOR */
         CreateFolder();
         return true;
       }
@@ -217,7 +219,6 @@ bool CPanel::OnKeyDown(LPNMLVKEYDOWN keyDownInfo, LRESULT &result)
     {
       if (ctrl && !alt && !shift)
       {
-        // EnterToFocused();
         return true;
       }
       break;
@@ -242,29 +243,9 @@ bool CPanel::OnKeyDown(LPNMLVKEYDOWN keyDownInfo, LRESULT &result)
         SelectSpec(false);
       return true;
     }
-    /*
-    case VK_DELETE:
-      CommandDelete();
-      return 0;
-    case VK_F1:
-      CommandHelp();
-      return 0;
-    */
     case VK_BACK:
       OpenParentFolder();
       return true;
-    /*
-    case VK_DIVIDE:
-    case '\\':
-    case '/':
-    case VK_OEM_5:
-    {
-      // OpenRootFolder();
-      OpenDrivesFolder();
-
-      return true;
-    }
-    */
     case 'A':
       if (ctrl)
       {
