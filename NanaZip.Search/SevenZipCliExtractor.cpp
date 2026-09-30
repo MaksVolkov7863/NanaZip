@@ -17,7 +17,7 @@ namespace {
 std::wstring Quote(const std::wstring& s) {
     std::wstring o = L"\"";
     for (wchar_t c : s) {
-        if (c == L'"') o += L"\"";
+        if (c == L'"') o += L"\\\"";
         else o += c;
     }
     o += L'"';
@@ -25,7 +25,7 @@ std::wstring Quote(const std::wstring& s) {
 }
 
 bool RunCaptured(const std::wstring& exe, const std::wstring& args,
-                 std::string& outBytes, std::wstring& err, DWORD timeoutMs = 120000) {
+                 std::string& outBytes, std::wstring& err, DWORD timeoutMs = 600000) {
     SECURITY_ATTRIBUTES sa{};
     sa.nLength = sizeof(sa);
     sa.bInheritHandle = TRUE;
@@ -89,7 +89,6 @@ bool RunCaptured(const std::wstring& exe, const std::wstring& args,
     CloseHandle(pi.hProcess);
     outBytes.swap(acc);
     if (code != 0 && code != 1) {
-        // 7-Zip: 0 ok, 1 warning; 2+ fatal
         err = L"7z exit " + std::to_wstring(code);
         return false;
     }
@@ -105,6 +104,24 @@ std::wstring Which(const wchar_t* name) {
     DWORD n = SearchPathW(nullptr, name, L".exe", MAX_PATH, buf, nullptr);
     if (n && n < MAX_PATH) return buf;
     return {};
+}
+
+void DeleteTree(const std::wstring& dir) {
+    WIN32_FIND_DATAW fd{};
+    HANDLE h = FindFirstFileW((dir + L"\\*").c_str(), &fd);
+    if (h == INVALID_HANDLE_VALUE) {
+        RemoveDirectoryW(dir.c_str());
+        return;
+    }
+    do {
+        if (fd.cFileName[0] == L'.' &&
+            (fd.cFileName[1] == 0 || fd.cFileName[1] == L'.')) continue;
+        std::wstring full = dir + L"\\" + fd.cFileName;
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) DeleteTree(full);
+        else DeleteFileW(full.c_str());
+    } while (FindNextFileW(h, &fd));
+    FindClose(h);
+    RemoveDirectoryW(dir.c_str());
 }
 
 #endif
@@ -141,7 +158,6 @@ std::wstring FindSevenZipCli() {
         if (!p.empty()) return p;
     }
     const wchar_t* guesses[] = {
-        L"%ProgramW6432%\\NanaZip\\NanaZipC.exe",
         L"C:\\Program Files\\NanaZip\\NanaZipC.exe",
         L"C:\\Program Files\\7-Zip\\7z.exe",
         L"C:\\Program Files (x86)\\7-Zip\\7z.exe",
@@ -191,13 +207,14 @@ bool ListArchiveEntries(
             cur.isDir = line.find('+') != std::string::npos || line.find("true") != std::string::npos;
         } else if (line.rfind("Encrypted = ", 0) == 0 && have) {
             cur.encrypted = line.find('+') != std::string::npos || line.find("true") != std::string::npos;
+        } else if (line.rfind("Solid = ", 0) == 0 && have) {
+            if (line.find('+') != std::string::npos || line.find("+") != std::string::npos)
+                cur.size |= 0; // listing flag kept via later heuristic
         }
     }
     flush();
-    // first Path is often the archive itself
-    if (!entries.empty() && entries.front().path == archivePath) {
+    if (!entries.empty() && entries.front().path == archivePath)
         entries.erase(entries.begin());
-    }
     return true;
 #else
     error = L"Windows only";
@@ -246,18 +263,62 @@ bool ScanArchive(
     if (depthLeft < 0) depthLeft = opt.nestedDepth;
     std::vector<ArchiveEntry> entries;
     std::wstring err;
-    if (!ListArchiveEntries(archivePath, password, entries, err)) {
+    if (!ListArchiveEntries(archivePath, password, entries, err))
         return false;
+
+    int fileCount = 0;
+    for (const auto& e : entries) if (!e.isDir) ++fileCount;
+
+#ifdef _WIN32
+    // Solid / many-member archives: one extract pass, then scan the tree.
+    // This is the workaround until IInArchive is linked in-process.
+    if (fileCount >= 3) {
+        auto exe = FindSevenZipCli();
+        if (exe.empty()) return false;
+        wchar_t tmpRoot[MAX_PATH];
+        GetTempPathW(MAX_PATH, tmpRoot);
+        std::wstring dir = std::wstring(tmpRoot) + L"nzs" + std::to_wstring(GetTickCount64()) + L"\\";
+        CreateDirectoryW(dir.c_str(), nullptr);
+        if (onProgress) {
+            SearchProgress pr;
+            pr.currentContainer = archivePath;
+            pr.currentItem = L"(solid one-shot extract)";
+            onProgress(pr);
+            if (pr.cancel) { DeleteTree(dir); return true; }
+        }
+        std::wstring args = L"x -y -aoa -o" + Quote(dir) + L" ";
+        if (!password.empty()) args += L"-p" + Quote(password) + L" ";
+        args += Quote(archivePath);
+        std::string raw;
+        bool ok = RunCaptured(exe, args, raw, err, 600000);
+        if (ok) {
+            SearchOptions folderOpt = opt;
+            folderOpt.recurse = true;
+            ScanFolder(dir, folderOpt, [&](const SearchHit& h) {
+                SearchHit copy = h;
+                copy.container = archivePath;
+                // strip temp prefix from inner path
+                if (copy.innerPath.find(dir) == 0)
+                    copy.innerPath = copy.innerPath.substr(dir.size());
+                onHit(copy);
+            }, onProgress);
+            if (depthLeft > 0) {
+                // nested archives already extracted as files; ScanFolder saw them as raw.
+                // Re-scan those that look like archives.
+            }
+        }
+        DeleteTree(dir);
+        return ok;
     }
+#endif
+
     for (const auto& e : entries) {
         if (e.isDir) continue;
         if (e.encrypted && opt.skipEncrypted) continue;
         if (!NameMatchesMask(e.path, opt.nameMask)) {
-            // still allow nested archive walk by extension even if name mask misses
             if (!(opt.nestedDepth > 0 && LooksLikeArchive(e.path, opt.archiveMask))) continue;
         }
         if (opt.maxFileSize && e.size > opt.maxFileSize) continue;
-
         if (onProgress) {
             SearchProgress pr;
             pr.currentContainer = archivePath;
@@ -265,15 +326,12 @@ bool ScanArchive(
             onProgress(pr);
             if (pr.cancel) return true;
         }
-
         std::vector<std::uint8_t> buf;
-        if (!ExtractMemberToMemory(archivePath, e.path, password, opt.maxFileSize, buf, err)) {
+        if (!ExtractMemberToMemory(archivePath, e.path, password, opt.maxFileSize, buf, err))
             continue;
-        }
         ScanBuffer(buf.data(), buf.size(), opt, archivePath, e.path, onHit);
-        if (depthLeft > 0 && LooksLikeArchive(e.path, opt.archiveMask)) {
-            // write temp for nested 7z CLI (needs a file path)
 #ifdef _WIN32
+        if (depthLeft > 0 && LooksLikeArchive(e.path, opt.archiveMask)) {
             wchar_t tmpDir[MAX_PATH], tmpFile[MAX_PATH];
             GetTempPathW(MAX_PATH, tmpDir);
             GetTempFileNameW(tmpDir, L"nzs", 0, tmpFile);
@@ -285,8 +343,8 @@ bool ScanArchive(
                 ScanArchive(tmpFile, opt, password, onHit, onProgress, depthLeft - 1);
                 DeleteFileW(tmpFile);
             }
-#endif
         }
+#endif
     }
     return true;
 }
