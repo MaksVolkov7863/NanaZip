@@ -23,6 +23,25 @@ std::wstring ToLower(std::wstring s) {
     return s;
 }
 
+std::string WideToUtf8(const std::wstring& w) {
+    std::string out;
+    out.reserve(w.size());
+    for (wchar_t ch : w) {
+        const unsigned int cp = static_cast<unsigned int>(ch);
+        if (cp < 0x80) {
+            out.push_back(static_cast<char>(cp));
+        } else if (cp < 0x800) {
+            out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+            out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+        } else {
+            out.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+            out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+            out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+        }
+    }
+    return out;
+}
+
 bool WildMatch(const wchar_t* text, const wchar_t* pat) {
     const wchar_t* star = nullptr;
     const wchar_t* ss = text;
@@ -118,7 +137,6 @@ bool NameMatchesMask(const std::wstring& name, const std::wstring& mask) {
     if (mask.empty() || mask == L"*") return true;
     std::wstring n = ToLower(name);
     std::wstring m = ToLower(mask);
-    // support space-separated alternative masks
     std::wstring cur;
     for (std::size_t i = 0; i <= m.size(); ++i) {
         if (i == m.size() || m[i] == L' ') {
@@ -201,12 +219,11 @@ bool ScanBuffer(
 
     if (opt.mode == MatchMode::Regex) {
         try {
-            std::string q(opt.query.begin(), opt.query.end());
+            const std::string q = WideToUtf8(opt.query);
             auto flags = std::regex::ECMAScript;
             if (!opt.caseSensitive) flags |= std::regex::icase;
             std::regex re(q, flags);
             std::string hay(reinterpret_cast<const char*>(p), reinterpret_cast<const char*>(p) + size);
-            // avoid huge binary blobs in regex
             if (hay.size() > opt.maxFileSize) return true;
             for (std::sregex_iterator it(hay.begin(), hay.end(), re), end; it != end; ++it) {
                 emit(static_cast<std::size_t>(it->position()), L"regex");
@@ -217,24 +234,7 @@ bool ScanBuffer(
         return true;
     }
 
-    // Literal: search UTF-8 / raw bytes. UTF-16 LE is searched as widened pattern.
-    std::string q8;
-    q8.reserve(opt.query.size());
-    for (wchar_t ch : opt.query) {
-        if (ch < 128) q8.push_back(static_cast<char>(ch));
-        else {
-            // encode as UTF-8
-            unsigned int cp = static_cast<unsigned int>(ch);
-            if (cp < 0x800) {
-                q8.push_back(static_cast<char>(0xC0 | (cp >> 6)));
-                q8.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
-            } else {
-                q8.push_back(static_cast<char>(0xE0 | (cp >> 12)));
-                q8.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
-                q8.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
-            }
-        }
-    }
+    const std::string q8 = WideToUtf8(opt.query);
     auto hits8 = BoyerMooreHorspool(
         p, size,
         reinterpret_cast<const std::uint8_t*>(q8.data()), q8.size(),
@@ -244,7 +244,6 @@ bool ScanBuffer(
         emit(off, L"utf-8/ansi");
     }
 
-    // UTF-16 LE pattern
     std::vector<std::uint8_t> q16;
     q16.reserve(opt.query.size() * 2);
     for (wchar_t ch : opt.query) {
@@ -293,7 +292,7 @@ bool ScanFile(
     }
     return ScanBuffer(buf.data(), rd, opt, path, FileNameOf(path), onHit);
 #else
-    std::ifstream in(std::string(path.begin(), path.end()), std::ios::binary);
+    std::ifstream in(WideToUtf8(path), std::ios::binary);
     if (!in) return false;
     std::vector<std::uint8_t> buf((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     return ScanBuffer(buf.data(), buf.size(), opt, path, FileNameOf(path), onHit);
