@@ -7,12 +7,15 @@
 #endif
 #include <windows.h>
 #include <commctrl.h>
+#include <commdlg.h>
 #include <process.h>
 #include <string>
 #include <vector>
 #include <atomic>
+#include <functional>
 
 #pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "comdlg32.lib")
 
 using namespace NanaZip::Search;
 
@@ -74,7 +77,6 @@ void AddHit(HWND list, const SearchHit& h) {
 
 unsigned __stdcall Worker(void* p) {
     Job* job = static_cast<Job*>(p);
-    HWND list = GetDlgItem(job->hwnd, IDC_LIST);
     int hits = 0;
     auto onHit = [&](const SearchHit& h) {
         if (g_cancel) return;
@@ -251,7 +253,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             g_cancel = true;
             return 0;
         case IDC_BROWSE: {
-            // folder picker via SHBrowseForFolder is heavy; use simple GetOpenFileName
             wchar_t file[MAX_PATH] = {};
             OPENFILENAMEW ofn{};
             ofn.lStructSize = sizeof(ofn);
