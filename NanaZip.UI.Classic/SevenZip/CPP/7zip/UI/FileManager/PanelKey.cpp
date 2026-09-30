@@ -6,6 +6,7 @@
 
 #include "../../PropID.h"
 #include "App.h"
+#include "../../../../../FindFilesDialog.h"
 
 using namespace NWindows;
 
@@ -83,7 +84,9 @@ bool CPanel::OnKeyDown(LPNMLVKEYDOWN keyDownInfo, LRESULT &result)
 
   if (ctrl && !alt && !shift && (keyDownInfo->wVKey == 'F' || keyDownInfo->wVKey == 'f'))
   {
-    g_App.FindFiles();
+    NanaZip::FileManager::FindFilesDialog::Show(
+        g_HWND,
+        _currentFolderPrefix.IsEmpty() ? L"." : _currentFolderPrefix.Ptr());
     return true;
   }
 
@@ -218,9 +221,7 @@ bool CPanel::OnKeyDown(LPNMLVKEYDOWN keyDownInfo, LRESULT &result)
     case VK_NEXT:
     {
       if (ctrl && !alt && !shift)
-      {
         return true;
-      }
       break;
     }
     case VK_ADD:
@@ -247,53 +248,25 @@ bool CPanel::OnKeyDown(LPNMLVKEYDOWN keyDownInfo, LRESULT &result)
       OpenParentFolder();
       return true;
     case 'A':
-      if (ctrl)
-      {
-        SelectAll(true);
-        return true;
-      }
+      if (ctrl) { SelectAll(true); return true; }
       return false;
     case 'X':
-      if (ctrl)
-      {
-        EditCut();
-        return true;
-      }
+      if (ctrl) { EditCut(); return true; }
       return false;
     case 'C':
-      if (ctrl)
-      {
-        EditCopy();
-        return true;
-      }
+      if (ctrl) { EditCopy(); return true; }
       return false;
     case 'V':
-      if (ctrl)
-      {
-        EditPaste();
-        return true;
-      }
+      if (ctrl) { EditPaste(); return true; }
       return false;
     case 'N':
-      if (ctrl)
-      {
-        CreateFile();
-        return true;
-      }
+      if (ctrl) { CreateFile(); return true; }
       return false;
     case 'R':
-      if (ctrl)
-      {
-        OnReload();
-        return true;
-      }
+      if (ctrl) { OnReload(); return true; }
       return false;
     case 'Z':
-      if (ctrl)
-      {
-        ChangeComment();
-        return true;
-      }
+      if (ctrl) { ChangeComment(); return true; }
       return false;
     case '1':
     case '2':
@@ -301,16 +274,13 @@ bool CPanel::OnKeyDown(LPNMLVKEYDOWN keyDownInfo, LRESULT &result)
     case '4':
       if (ctrl)
       {
-        int styleIndex = keyDownInfo->wVKey - '1';
-        SetListViewMode(styleIndex);
+        SetListViewMode(keyDownInfo->wVKey - '1');
         return true;
       }
       return false;
     case VK_MULTIPLY:
-      {
-        InvertSelection();
-        return true;
-      }
+      InvertSelection();
+      return true;
     case VK_F12:
       if (alt && !ctrl && !shift)
       {
