@@ -1,19 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project>
-  <!-- Picked up automatically by MSBuild next to NanaZip.vcxproj. -->
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\NanaZip.Search;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="$(MSBuildThisFileDirectory)FindFilesDialog.cpp" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)..\NanaZip.Search\ArchiveSearch.cpp" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)..\NanaZip.Search\FindFilesDialog.cpp" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)..\NanaZip.Search\SevenZipCliExtractor.cpp" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)FindFilesDialog.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)..\NanaZip.Search\ArchiveSearch.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)..\NanaZip.Search\FindFilesDialog.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)..\NanaZip.Search\SevenZipCliExtractor.h" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)FindFilesDialog.cpp">
+      <ObjectFileName>$(IntDir)FindFilesDialog_Classic.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\NanaZip.Search\ArchiveSearch.cpp">
+      <ObjectFileName>$(IntDir)ArchiveSearch.obj</ObjectFileName>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <DisableSpecificWarnings>4244;4267;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\NanaZip.Search\FindFilesDialog.cpp">
+      <ObjectFileName>$(IntDir)FindFilesDialog_Search.obj</ObjectFileName>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <DisableSpecificWarnings>4244;4267;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\NanaZip.Search\SevenZipCliExtractor.cpp">
+      <ObjectFileName>$(IntDir)SevenZipCliExtractor.obj</ObjectFileName>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <DisableSpecificWarnings>4244;4267;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
   </ItemGroup>
 </Project>
