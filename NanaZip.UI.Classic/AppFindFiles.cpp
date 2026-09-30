@@ -1,11 +1,9 @@
-/* Hook used by Classic File Manager. */
+/*
+ * Classic File Manager command: Find files
+ */
+
 #include "FindFilesDialog.h"
 #include "SevenZip/CPP/7zip/UI/FileManager/App.h"
-#include "SevenZip/CPP/7zip/UI/FileManager/resource.h"
-
-#ifndef IDM_FIND_FILES
-#define IDM_FIND_FILES 962
-#endif
 
 void CApp::FindFiles()
 {

@@ -1,43 +1,39 @@
-# Hook Find files into NanaZip Classic File Manager
+# Classic File Manager — Find files
 
-1. Add to `NanaZip.UI.Classic/NanaZip.vcxproj` ClCompile items:
+## Already in the tree
+
+- `IDM_FIND_FILES` 962 in `resource.h`
+- `CApp::FindFiles()` in `App.h` + `AppFindFiles.cpp`
+- `Ctrl+F` in the file list (`PanelKey.cpp`) calls `g_App.FindFiles()`
+- Window implementation: `NanaZip.Search/FindFilesDialog.cpp`
+
+## Still add when you open the project in VS
+
+1. `NanaZip.UI.Classic/NanaZip.vcxproj` ClCompile:
 
 ```xml
 <ClCompile Include="FindFilesDialog.cpp" />
+<ClCompile Include="AppFindFiles.cpp" />
 <ClCompile Include="..\NanaZip.Search\FindFilesDialog.cpp" />
 <ClCompile Include="..\NanaZip.Search\ArchiveSearch.cpp" />
 <ClCompile Include="..\NanaZip.Search\SevenZipCliExtractor.cpp" />
 ```
 
-And headers:
-
-```xml
-<ClInclude Include="FindFilesDialog.h" />
-```
-
-2. In the File Manager command handler (where Help/About is dispatched,
-   typically `App.cpp` / `PanelMenu.cpp` command `kFind` / IDM_EDIT_FIND):
+2. `MyLoadMenu.cpp` next to About:
 
 ```cpp
-#include "FindFilesDialog.h"
+#include "../../../../../FindFilesDialog.h"
 
-case IDM_EDIT_FIND: // or kFind / 'F' with Ctrl
-  NanaZip::FileManager::FindFilesDialog::Show(_window, currentFolderOrArchive);
-  break;
+case IDM_FIND_FILES:
+    g_App.FindFiles();
+    break;
 ```
 
-3. Menu string: `Find files...\tCtrl+F` next to Test/Extract.
+3. `resource.rc` Edit and Tools menus + accelerator:
 
-4. Until that wiring lands, run the standalone window:
-
-```bat
-cd NanaZip.Search
-cl /EHsc /std:c++17 /O2 /DUNICODE /D_UNICODE /D_CRT_SECURE_NO_WARNINGS ^
-  FindFilesApp.cpp FindFilesDialog.cpp ArchiveSearch.cpp SevenZipCliExtractor.cpp ^
-  comdlg32.lib comctl32.lib user32.lib gdi32.lib ^
-  /Fe:nanazip-find.exe
-
-nanazip-find.exe D:\backups
+```
+MENUITEM "Find files...\tCtrl+F", IDM_FIND_FILES
+"F", IDM_FIND_FILES, VIRTKEY, CONTROL, NOINVERT
 ```
 
-Need `NanaZipC.exe` or `7z.exe` on PATH to search inside archives.
+Ctrl+F in the panel works after building `AppFindFiles.cpp` + search sources even before the menu RC is edited.
