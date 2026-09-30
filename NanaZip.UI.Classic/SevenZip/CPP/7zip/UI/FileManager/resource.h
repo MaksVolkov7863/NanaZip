@@ -1,4 +1,4 @@
-﻿#include "resourceGui.h"
+#include "resourceGui.h"
 
 #define IDR_MENUBAR1      70
 #define IDM_MENU          71
@@ -93,8 +93,6 @@
 #define IDM_FOLDERS_HISTORY      736
 #define IDM_VIEW_REFRESH         737
 #define IDM_VIEW_AUTO_REFRESH    738
-// #define IDM_VIEW_SHOW_DELETED    739
-// #define IDM_VIEW_SHOW_STREAMS    740
 
 #define IDM_VIEW_ARCHIVE_TOOLBAR            750
 #define IDM_VIEW_STANDARD_TOOLBAR           751
@@ -110,6 +108,7 @@
 #define IDM_BENCHMARK2           902
 
 #define IDM_ABOUT                961
+#define IDM_FIND_FILES           962
 
 #define IDS_OPTIONS                     2100
 
