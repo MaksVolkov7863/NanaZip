@@ -25,6 +25,43 @@ jobs:
         run: dotnet nuget locals all --clear
       - name: Build
         run: MSBuild -binaryLogger:Output\BuildAllTargets.binlog -m BuildAllTargets.proj
+      - name: Add Classic File Manager to portable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $copied = 0
+          foreach ($arch in 'x64','arm64') {
+            $plat = if ($arch -eq 'arm64') { 'ARM64' } else { 'x64' }
+            $candidates = @(
+              "Output/Binaries/Release/$plat/NanaZip.exe",
+              "Output/Binaries/Release/$arch/NanaZip.exe",
+              "Output/Binaries/Release/NanaZipPackage/$arch/NanaZip.exe"
+            )
+            $exe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $exe) {
+              $found = Get-ChildItem -Path Output -Recurse -Filter NanaZip.exe -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -match "[\\/]$plat[\\/]|[\\/]$arch[\\/]" -and $_.Name -eq 'NanaZip.exe' } |
+                Select-Object -First 1
+              if ($found) { $exe = $found.FullName }
+            }
+            if (-not $exe) {
+              Write-Warning "NanaZip.exe not found for $arch"
+              continue
+            }
+            $dest = "Output/Binaries/Root/Binaries/$arch"
+            New-Item -ItemType Directory -Force -Path $dest | Out-Null
+            Copy-Item $exe (Join-Path $dest 'NanaZip.exe') -Force
+            $pdb = [System.IO.Path]::ChangeExtension($exe, '.pdb')
+            if (Test-Path $pdb) {
+              $sym = "Output/Binaries/Root/Symbols/$arch"
+              New-Item -ItemType Directory -Force -Path $sym | Out-Null
+              Copy-Item $pdb (Join-Path $sym 'NanaZip.pdb') -Force
+            }
+            Write-Host "Copied $exe -> $dest\NanaZip.exe"
+            $copied++
+          }
+          if ($copied -lt 1) { throw 'Classic NanaZip.exe was not produced; portable would still have no file manager.' }
+          Get-ChildItem Output/Binaries/Root/Binaries -Recurse -Filter *.exe | ForEach-Object { $_.FullName }
       - name: Upload MSIX Bundle
         uses: actions/upload-artifact@v7.0.1
         with:
